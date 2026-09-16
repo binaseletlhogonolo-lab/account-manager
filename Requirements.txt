@@ -1,0 +1,56 @@
+START AccountManager
+
+  CREATE balances as empty dictionary
+  CREATE history as empty dictionary
+
+  FUNCTION initUser(user):
+    IF user not in balances:
+      balances[user] = 0
+      history[user] = empty list
+
+  FUNCTION deposit(user, amount):
+    initUser(user)
+    balances[user] = balances[user] + amount
+    ADD {amount, currentTime} TO history[user]
+    RETURN balances[user]
+
+  FUNCTION withdraw(user, amount):
+    initUser(user)
+
+    // RULE 1: Not Enough Money
+    IF balances[user] < amount:
+      RETURN "Blocked: Not Enough Money"
+
+    // RULE 2: Too Fast (3 in 10 seconds)
+    now = currentTime
+    count = 0
+    FOR EACH transaction IN history[user]:
+      IF (now - transaction.time) < 10 seconds:
+        count = count + 1
+    IF count >= 3:
+      RETURN "Blocked: Too Fast (Rapid Withdrawals)"
+
+    // RULE 3: Unusual Spike (5x average)
+    IF history[user] is not empty:
+      sum = total of all amounts in history[user]
+      average = sum / number of transactions in history[user]
+      IF amount > (average * 5):
+        RETURN "Blocked: Unusual Spending Spike"
+
+    // If all checks pass
+    balances[user] = balances[user] - amount
+    ADD {amount, now} TO history[user]
+    RETURN balances[user]
+
+  FUNCTION transfer(fromUser, toUser, amount):
+    initUser(fromUser)
+    initUser(toUser)
+
+    result = withdraw(fromUser, amount)
+    IF result contains "Blocked":
+      RETURN result
+
+    deposit(toUser, amount)
+    RETURN balances[fromUser]
+
+END AccountManager
