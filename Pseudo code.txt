@@ -1,0 +1,51 @@
+CREATE balances = empty map
+CREATE history = empty list
+
+FUNCTION deposit(username, amount):
+    IF amount <= 0 THEN
+        RETURN "Invalid amount"
+
+    IF username NOT IN balances THEN
+        balances[username] = 0
+
+    balances[username] = balances[username] + amount
+    ADD {user: username, type: "deposit", amount: amount, time: now()} TO history
+
+    RETURN "Success: " + username + " new balance " + balances[username]
+
+FUNCTION withdraw(username, amount):
+    IF amount <= 0 THEN
+        RETURN "Invalid amount"
+
+    IF username NOT IN balances THEN
+        RETURN "User not found"
+
+    IF balances[username] < amount THEN
+        RETURN "Blocked: Not enough funds"
+
+    // Fraud Check
+    recent = COUNT history WHERE user=username AND type="withdraw" AND time > now()-10sec
+
+    IF recent >= 3 THEN
+        RETURN "Blocked: Too fast - 3 withdrawals in 10 seconds"
+
+    balances[username] = balances[username] - amount
+    ADD {user: username, type: "withdraw", amount: amount, time: now()} TO history
+
+    RETURN "Success"
+
+FUNCTION transfer(fromUser, toUser, amount):
+    IF amount <= 0 THEN
+        RETURN "Invalid amount"
+
+    IF fromUser NOT IN balances OR toUser NOT IN balances THEN
+        RETURN "User not found"
+
+    result = withdraw(fromUser, amount)
+
+    IF result CONTAINS "Blocked" OR "Error" THEN
+        RETURN result
+
+    deposit(toUser, amount)
+
+    RETURN "Transfer Success: " + fromUser + " -> " + toUser
